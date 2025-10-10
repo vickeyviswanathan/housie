@@ -1,0 +1,560 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Housie Game Generator</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.2/dist/confetti.browser.min.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700;900&family=Roboto+Mono:wght@700&family=Lexend:wght@400;600;700&family=Playfair+Display:wght@700&display=swap" rel="stylesheet">
+    <style>
+        @keyframes aurora {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+        
+        @keyframes stars {
+            0% { background-position: 0 0; }
+            100% { background-position: -10000px 5000px; }
+        }
+        
+        @keyframes bokeh {
+            0% { transform: translateY(0); opacity: 0.5; }
+            100% { transform: translateY(-100vh); opacity: 0; }
+        }
+
+
+        :root {
+            --font-display: 'Lexend', sans-serif;
+            --font-body: 'Poppins', sans-serif;
+            --font-mono: 'Roboto Mono', monospace;
+            --bg-color: #F8F7F4;
+            --bg-animation: none;
+            --bg-image: none;
+            --card-bg: rgba(255, 255, 255, 0.7);
+            --card-border: rgba(0, 0, 0, 0.1);
+            --text-primary: #1a202c;
+            --text-secondary: #4a5568;
+            --primary-accent: #2c5282;
+            --primary-accent-text: #ffffff;
+            --secondary-accent: #e2e8f0;
+            --secondary-accent-text: #2d3748;
+            --destructive-accent: #c53030;
+            --destructive-accent-text: #ffffff;
+            --tab-bg: transparent;
+            --tab-active-bg: var(--primary-accent);
+            --tab-active-text: var(--primary-accent-text);
+            --called-bg: var(--primary-accent);
+            --called-text: var(--primary-accent-text);
+            --called-glow: 0 0 12px var(--primary-accent);
+        }
+
+        body {
+            font-family: var(--font-body);
+            background-color: var(--bg-color);
+            background-image: var(--bg-image);
+            background-size: cover;
+            animation: var(--bg-animation);
+            color: var(--text-primary);
+            transition: background-color 0.5s ease;
+            overflow: hidden;
+        }
+
+        .card {
+            background-color: var(--card-bg);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid var(--card-border);
+            border-radius: 1.5rem;
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.1);
+        }
+        .btn { transition: all 0.2s ease-in-out; }
+        .btn:hover { transform: translateY(-3px); box-shadow: 0 4px 12px rgba(0,0,0,0.2); }
+        .btn-primary { background-color: var(--primary-accent); color: var(--primary-accent-text); }
+        .btn-secondary { background-color: var(--secondary-accent); color: var(--secondary-accent-text); }
+        .btn-destructive { background-color: var(--destructive-accent); color: var(--destructive-accent-text); }
+        
+        .number-cell { background-color: var(--secondary-accent); color: var(--secondary-accent-text); transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
+        .number-cell.called { background-color: var(--called-bg); color: var(--called-text); transform: scale(1.1); font-weight: 700; box-shadow: var(--called-glow); z-index: 1; }
+        
+        #tabs-container {
+            position: relative;
+            z-index: 10;
+        }
+        .tab { background-color: var(--tab-bg); color: var(--text-secondary); }
+        .tab.active { background-color: var(--tab-active-bg); color: var(--tab-active-text); font-weight: 600; }
+        .tab-content { display: none; }
+        .tab-content.active { display: flex; }
+        
+        /* Tumbler Styles */
+        .number-display-area {
+            height: 20rem; 
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .tumbler-container {
+            display: flex;
+            font-family: var(--font-display);
+            font-weight: 900;
+            font-size: 15rem; 
+            line-height: 1;
+        }
+
+        .tumbler-column {
+            height: 15rem; 
+            overflow: hidden;
+        }
+        
+        .tumbler-track {
+            display: flex;
+            flex-direction: column;
+            transition: transform 3s cubic-bezier(0.65, 0, 0.35, 1);
+        }
+
+        .tumbler-digit {
+            height: 15rem; 
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        @keyframes glow-reveal {
+            0%, 100% { filter: drop-shadow(0 0 0px var(--called-bg)); }
+            50% { filter: drop-shadow(0 0 25px var(--called-bg)); }
+        }
+        .glow-reveal-animation {
+            animation: glow-reveal 0.8s ease-out;
+        }
+        
+        #pending-prizes-display::-webkit-scrollbar { height: 4px; }
+        #pending-prizes-display::-webkit-scrollbar-thumb { background: var(--secondary-accent); border-radius: 10px; }
+
+
+        @media (max-width: 768px) {
+            .tumbler-container { font-size: 12rem; }
+            .tumbler-column, .tumbler-digit { height: 12rem; }
+        }
+         @media (max-width: 640px) {
+            .tumbler-container { font-size: 8rem; }
+            .tumbler-column, .tumbler-digit { height: 8rem; }
+        }
+        
+        .prize-name-input {
+            background: transparent;
+            border: none;
+            border-bottom: 2px solid transparent;
+            font-weight: 500;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+        .prize-name-input:focus {
+            border-bottom-color: var(--primary-accent);
+        }
+    </style>
+</head>
+<body class="antialiased font-body">
+    <div id="bokeh-container" class="fixed top-0 left-0 w-full h-full overflow-hidden pointer-events-none -z-10"></div>
+    <div id="app-container" class="p-4 md:p-6 h-screen flex flex-col">
+
+        <main class="flex-grow min-h-0 relative">
+            <!-- SETUP VIEW -->
+            <div id="setup-view" class="absolute inset-0 flex flex-col items-center justify-center">
+                <div class="max-w-4xl mx-auto text-center mb-10">
+                    <h1 class="font-display text-5xl md:text-6xl font-bold">Housie Night Setup</h1>
+                    <p class="text-xl text-text-secondary mt-2">Craft your perfect game experience.</p>
+                </div>
+                <div class="max-w-xl w-full mx-auto card p-6 md:p-8">
+                    <div class="mb-8">
+                        <label class="block text-lg font-semibold mb-3">1. Choose The Vibe</label>
+                        <select id="theme-selector" class="w-full p-3 rounded-lg border-2 border-[var(--card-border)] focus:ring-2 focus:ring-[var(--primary-accent)] outline-none text-lg bg-[var(--secondary-accent)] text-[var(--secondary-accent-text)]"></select>
+                    </div>
+                     <div class="mb-8">
+                        <h2 class="text-lg font-semibold mb-3">2. Set Prizes & Rewards</h2>
+                        <div id="prize-list-setup" class="space-y-3 text-sm max-h-40 overflow-y-auto pr-2"></div>
+                        <div id="full-housie-controls" class="mt-4 pt-4 border-t border-[var(--card-border)] flex justify-between items-center">
+                            <h3 class="font-semibold">Full Housie Prizes</h3>
+                            <button id="add-housie-btn" class="px-4 py-1.5 rounded-full text-sm font-semibold btn btn-secondary text-xs">+ Add Housie</button>
+                        </div>
+                    </div>
+                    <button id="start-game-btn" class="w-full py-4 text-xl font-bold rounded-xl btn btn-primary">Let's Play!</button>
+                </div>
+            </div>
+
+            <!-- GAME VIEW -->
+            <div id="game-view" class="absolute inset-0 hidden h-full flex-col">
+                <div class="max-w-5xl mx-auto flex flex-col h-full w-full">
+                    <div class="card p-2 sm:p-4 flex-grow flex flex-col min-h-0">
+                        <div id="tabs-container" class="grid grid-cols-2 sm:grid-cols-5 gap-2 p-1 rounded-full mb-4 shrink-0">
+                            <button data-tab="generator" class="tab flex-1 py-2 px-4 rounded-full text-center font-semibold transition-all duration-300 active">Generator</button>
+                            <button data-tab="board" class="tab flex-1 py-2 px-4 rounded-full text-center font-semibold transition-all duration-300">Board</button>
+                            <button data-tab="prizes" class="tab flex-1 py-2 px-4 rounded-full text-center font-semibold transition-all duration-300">Prizes</button>
+                            <button data-tab="controls" class="tab flex-1 py-2 px-4 rounded-full text-center font-semibold transition-all duration-300">Controls</button>
+                            <button data-tab="rules" class="tab flex-1 py-2 px-4 rounded-full text-center font-semibold transition-all duration-300">Rules</button>
+                        </div>
+
+                        <div class="flex-grow min-h-0 relative">
+                            <div id="tab-content-generator" class="tab-content active flex-col items-center w-full p-2 h-full">
+                               <div class="flex-grow flex items-center justify-center number-display-area">
+                                    <div id="current-number-display" class="tumbler-container">
+                                        <div class="tumbler-column"><div id="tumbler-tens" class="tumbler-track"></div></div>
+                                        <div class="tumbler-column"><div id="tumbler-ones" class="tumbler-track"></div></div>
+                                    </div>
+                               </div>
+                               <div class="w-full shrink-0">
+                                    <div class="w-full shrink-0 px-4 mb-4">
+                                        <p class="text-sm font-semibold text-text-secondary uppercase tracking-wider text-center mb-2">Pending Prizes</p>
+                                        <div id="pending-prizes-display" class="flex gap-2 overflow-x-auto pb-2 justify-center">
+                                        </div>
+                                    </div>
+                                    <div class="w-full grid grid-cols-3 items-center text-center mb-6 px-4">
+                                        <div class="text-center">
+                                            <p class="text-xs font-semibold text-text-secondary uppercase tracking-wider">Called</p>
+                                            <p id="remaining-count" class="font-bold text-2xl md:text-3xl font-mono">0 / 90</p>
+                                        </div>
+                                        <div class="text-center bg-[var(--secondary-accent)] text-[var(--secondary-accent-text)] rounded-xl p-2 mx-2">
+                                             <p class="text-xs font-semibold uppercase tracking-wider">Prize Money</p>
+                                             <div class="flex justify-center items-baseline gap-1">
+                                                <p id="remaining-prize-money" class="font-bold text-2xl md:text-3xl font-mono">₹0</p>
+                                                <p class="text-xs font-semibold">/ <span id="total-prize-money">₹0</span></p>
+                                             </div>
+                                             <p id="prizes-claimed-status" class="text-xs font-semibold uppercase tracking-wider">0 / 0 Claimed</p>
+                                        </div>
+                                        <div class="text-center">
+                                             <p class="text-xs font-semibold text-text-secondary uppercase tracking-wider">Last 5</p>
+                                             <div id="last-5-display" class="flex gap-1 justify-center mt-1"></div>
+                                        </div>
+                                    </div>
+                                    <button id="draw-number-btn" class="w-full max-w-lg mx-auto block py-5 text-2xl font-bold rounded-2xl btn btn-primary shadow-lg">Draw Number</button>
+                               </div>
+                            </div>
+                            <div id="tab-content-board" class="tab-content flex-col items-center w-full p-4 h-full overflow-y-auto">
+                                 <div class="grid grid-cols-10 gap-1 sm:gap-2 w-full max-w-2xl my-auto"></div>
+                            </div>
+                            <div id="tab-content-prizes" class="tab-content w-full p-4 h-full overflow-y-auto">
+                                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 w-full"></div>
+                            </div>
+                            <div id="tab-content-controls" class="tab-content flex-col items-center justify-center w-full p-4 h-full">
+                               <div class="max-w-md mx-auto w-full space-y-4">
+                                   <h3 class="font-display text-2xl font-bold text-center mb-4">Verification & Controls</h3>
+                                   <div>
+                                       <label for="ticket-input" class="font-semibold mb-1 block">Verify Ticket</label>
+                                       <textarea id="ticket-input" class="w-full h-20 p-2 border rounded-lg bg-[var(--secondary-accent)] border-[var(--card-border)] text-secondary-accent-text" placeholder="Enter numbers separated by spaces or commas..."></textarea>
+                                       <button id="verify-ticket-btn" class="w-full mt-2 py-2 rounded-lg btn btn-secondary font-semibold">Check Claim</button>
+                                       <div id="verification-result" class="mt-2 font-semibold text-center h-10"></div>
+                                   </div>
+                                   <div class="pt-4 border-t border-[var(--card-border)] space-y-3">
+                                       <button id="reset-game-btn" class="w-full py-3 rounded-xl btn btn-secondary font-bold">Reset Current Game</button>
+                                       <button id="back-to-setup-btn" class="w-full py-3 rounded-xl btn btn-destructive font-bold">Setup New Game</button>
+                                   </div>
+                               </div>
+                            </div>
+                            <div id="tab-content-rules" class="tab-content w-full p-4 h-full overflow-y-auto">
+                                <div class="max-w-2xl mx-auto space-y-4 text-text-secondary"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+        <footer class="text-center text-xs text-text-secondary py-2 shrink-0">
+            Created by Vivek Viswanathan
+        </footer>
+    </div>
+
+    <script>
+    window.addEventListener('load', () => {
+        // --- DOM ELEMENTS ---
+        const docRoot = document.documentElement.style;
+        const bokehContainer = document.getElementById('bokeh-container');
+        const setupView = document.getElementById('setup-view');
+        const gameView = document.getElementById('game-view');
+        const themeSelector = document.getElementById('theme-selector');
+        const startGameBtn = document.getElementById('start-game-btn'), prizeListSetup = document.getElementById('prize-list-setup');
+        const addHousieBtn = document.getElementById('add-housie-btn');
+        const numberBoardContainer = document.querySelector('#tab-content-board > div');
+        const remainingCount = document.getElementById('remaining-count');
+        const last5Display = document.getElementById('last-5-display');
+        const drawNumberBtn = document.getElementById('draw-number-btn');
+        const prizeListContainer = document.querySelector('#tab-content-prizes > div');
+        const backToSetupBtn = document.getElementById('back-to-setup-btn'), resetGameBtn = document.getElementById('reset-game-btn');
+        const ticketInput = document.getElementById('ticket-input'), verifyTicketBtn = document.getElementById('verify-ticket-btn'), verificationResult = document.getElementById('verification-result');
+        const tabsContainer = document.getElementById('tabs-container');
+        const rulesContentContainer = document.querySelector('#tab-content-rules > div');
+        const tumblerContainer = document.getElementById('current-number-display');
+        const tumblerTens = document.getElementById('tumbler-tens');
+        const tumblerOnes = document.getElementById('tumbler-ones');
+        const totalPrizeMoneyEl = document.getElementById('total-prize-money');
+        const remainingPrizeMoneyEl = document.getElementById('remaining-prize-money');
+        const prizesClaimedStatusEl = document.getElementById('prizes-claimed-status');
+        const pendingPrizesDisplay = document.getElementById('pending-prizes-display');
+
+        // --- GAME STATE & CONFIG ---
+        let gameState = { allNumbers: Array.from({ length: 90 }, (_, i) => i + 1), availableNumbers: [], calledNumbers: [], prizes: [], isDrawing: false, housieCounter: 0, totalPrizeMoney: 0, remainingPrizeMoney: 0 };
+        const themes = {
+             starlight_gala: { name: "Starlight Gala", vars: { '--font-display': "'Lexend', sans-serif", '--font-body': "'Poppins', sans-serif", '--font-mono': "'Roboto Mono', monospace", '--bg-color': "#0d1117", '--bg-image': 'url(https://www.transparenttextures.com/patterns/stardust.png)', '--bg-animation': 'stars 200s linear infinite', '--card-bg': "rgba(22, 27, 34, 0.7)", '--card-border': "rgba(255, 255, 255, 0.15)", '--text-primary': "#e6edf3", '--text-secondary': "#8b949e", '--primary-accent': "#d4af37", '--primary-accent-text': "#0d1117", '--secondary-accent': "#21262d", '--secondary-accent-text': "#e6edf3", '--destructive-accent': "#f85149", '--destructive-accent-text': "#ffffff", '--tab-bg': "transparent", '--tab-active-bg': "var(--primary-accent)", '--tab-active-text': "var(--primary-accent-text)", '--called-bg': "var(--primary-accent)", '--called-text': "var(--primary-accent-text)", '--called-glow': "0 0 15px var(--primary-accent)" } },
+             art_deco_soiree: { name: "Art Deco Soirée", vars: { '--font-display': "'Playfair Display', serif", '--font-body': "'Poppins', sans-serif", '--font-mono': "'Roboto Mono', monospace", '--bg-color': "#1a1a1a", '--bg-image': `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='100' viewBox='0 0 100 100'%3E%3Cg fill='%23d4af37' fill-opacity='0.05'%3E%3Cpath d='M0 50A50 50 0 0 1 50 0v50H0z' transform='translate(50,50) rotate(0)'/%3E%3Cpath d='M0 50A50 50 0 0 1 50 0v50H0z' transform='translate(50,50) rotate(90)'/%3E%3Cpath d='M0 50A50 50 0 0 1 50 0v50H0z' transform='translate(50,50) rotate(180)'/%3E%3Cpath d='M0 50A50 50 0 0 1 50 0v50H0z' transform='translate(50,50) rotate(270)'/%3E%3C/g%3E%3C/svg%3E")`, '--bg-animation': "none", '--card-bg': "rgba(30, 30, 30, 0.75)", '--card-border': "rgba(212, 175, 55, 0.3)", '--text-primary': "#f5eeda", '--text-secondary': "#d4af37", '--primary-accent': "#d4af37", '--primary-accent-text': "#1a1a1a", '--secondary-accent': "#2a2a2a", '--secondary-accent-text': "#f5eeda", '--destructive-accent': "#ff6b6b", '--destructive-accent-text': "#1a1a1a", '--tab-bg': "transparent", '--tab-active-bg': "var(--primary-accent)", '--tab-active-text': "var(--primary-accent-text)", '--called-bg': "#e6edf3", '--called-text': "#1a1a1a", '--called-glow': "0 0 12px #e6edf3" } },
+             diwali_glimmer: { name: "Diwali Glimmer", vars: { '--font-display': "'Lexend', sans-serif", '--font-body': "'Poppins', sans-serif", '--font-mono': "'Roboto Mono', monospace", '--bg-color': "#240046", '--bg-image': 'none', '--bg-animation': 'none', '--card-bg': "rgba(55, 22, 99, 0.7)", '--card-border': "rgba(255, 255, 255, 0.15)", '--text-primary': "#e0aaff", '--text-secondary': "#c77dff", '--primary-accent': "#ff006e", '--primary-accent-text': "#ffffff", '--secondary-accent': "#5a189a", '--secondary-accent-text': "#e0aaff", '--destructive-accent': "#ff4d4d", '--destructive-accent-text': "#ffffff", '--tab-bg': "transparent", '--tab-active-bg': "var(--primary-accent)", '--tab-active-text': "var(--primary-accent-text)", '--called-bg': "#ffd60a", '--called-text': "#240046", '--called-glow': "0 0 15px #ffd60a" } },
+             zen_garden: { name: "Zen Garden", vars: { '--font-display': "'Lexend', sans-serif", '--font-body': "'Poppins', sans-serif", '--font-mono': "'Roboto Mono', monospace", '--bg-color': "#f4f4f4", '--bg-image': 'url("data:image/svg+xml,%3Csvg width=\'60\' height=\'60\' viewBox=\'0 0 60 60\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cg fill=\'none\' fill-rule=\'evenodd\'%3E%3Cg fill=\'%23d4d4d4\' fill-opacity=\'0.4\'%3E%3Cpath d=\'M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z\'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")', '--bg-animation': 'none', '--card-bg': "rgba(255, 255, 255, 0.8)", '--card-border': "rgba(0, 0, 0, 0.08)", '--text-primary': "#2d3748", '--text-secondary': "#718096", '--primary-accent': "#2f855a", '--primary-accent-text': "#ffffff", '--secondary-accent': "#e2e8f0", '--secondary-accent-text': "#2d3748", '--destructive-accent': "#c53030", '--destructive-accent-text': "#ffffff", '--tab-bg': "transparent", '--tab-active-bg': "var(--primary-accent)", '--tab-active-text': "var(--primary-accent-text)", '--called-bg': "var(--primary-accent)", '--called-text': "var(--primary-accent-text)", '--called-glow': "0 0 12px var(--primary-accent)" } }
+        };
+        const initialPrizes = [
+            { id: 'jaldi-five', name: 'Jaldi Five', value: 100, checked: true, type: 'standard' },
+            { id: 'four-corners', name: 'Four Corners', value: 100, checked: true, type: 'standard' },
+            { id: 'top-line', name: 'Top Line', value: 150, checked: true, type: 'standard' },
+            { id: 'middle-line', name: 'Middle Line', value: 150, checked: true, type: 'standard' },
+            { id: 'bottom-line', name: 'Bottom Line', value: 150, checked: true, type: 'standard' }
+        ];
+        
+        // --- CORE FUNCTIONS ---
+        function init() {
+            Object.keys(themes).forEach(key => themeSelector.add(new Option(themes[key].name, key)));
+            applyTheme('starlight_gala'); 
+            buildPrizeSetup();
+            buildTumblers();
+            rulesContentContainer.innerHTML = `<h2 class="text-2xl font-bold font-display text-text-primary mb-4">How to Play Housie</h2> <p><strong class="text-text-primary">1. The Ticket:</strong> Each player has a ticket with 15 numbers, distributed across 3 rows and 9 columns.</p> <p><strong class="text-text-primary">2. The Draw:</strong> Numbers from 1 to 90 are drawn one by one at random.</p> <p><strong class="text-text-primary">3. Marking Numbers:</strong> As a number is called, players check their tickets and strike the number if it is present.</p> <p><strong class="text-text-primary">4. Winning Prizes:</strong> A player must make a claim to win a prize. Common winning patterns include:</p> <ul class="list-disc list-inside space-y-2 pl-4"> <li><strong>Jaldi Five:</strong> The first player to have any 5 numbers struck on their ticket.</li> <li><strong>Four Corners:</strong> The first and last numbers of the top and bottom rows.</li> <li><strong>Lines (Rows):</strong> Completing all 5 numbers in the top, middle, or bottom row.</li> <li><strong>Full Housie:</strong> The first player to have all 15 numbers on their ticket struck.</li> </ul> <p><strong class="text-text-primary">5. Making a Claim:</strong> When a player achieves a winning pattern, they must immediately call out to make a claim. The claim is verified against the numbers that have been called.</p>`;
+            
+            themeSelector.addEventListener('change', (e) => applyTheme(e.target.value));
+            startGameBtn.addEventListener('click', startGame);
+            drawNumberBtn.addEventListener('click', drawNumberAnimated);
+            addHousieBtn.addEventListener('click', addHousiePrizeInput);
+
+            backToSetupBtn.addEventListener('click', () => {
+                gameView.classList.add('hidden');
+                gameView.classList.remove('flex');
+                setupView.classList.remove('hidden');
+                setupView.classList.add('flex');
+            });
+            resetGameBtn.addEventListener('click', resetCurrentGame);
+            verifyTicketBtn.addEventListener('click', verifyTicket);
+            tabsContainer.addEventListener('click', (e) => { if(e.target.matches('.tab')) setActiveTab(e.target.dataset.tab); });
+        }
+        
+        function createBokeh() {
+            bokehContainer.innerHTML = '';
+            for (let i = 0; i < 30; i++) {
+                const circle = document.createElement('div');
+                circle.className = 'absolute rounded-full';
+                const size = Math.random() * 80 + 20;
+                circle.style.width = `${size}px`;
+                circle.style.height = `${size}px`;
+                circle.style.left = `${Math.random() * 100}%`;
+                circle.style.top = `${Math.random() * 100 + 100}%`;
+                const color = Math.random() > 0.5 ? '#ff006e' : '#ffd60a';
+                circle.style.backgroundColor = color;
+                circle.style.animation = `bokeh ${Math.random() * 20 + 10}s linear infinite`;
+                bokehContainer.appendChild(circle);
+            }
+        }
+
+
+        function applyTheme(themeKey) {
+            const theme = themes[themeKey];
+            Object.keys(theme.vars).forEach(key => docRoot.setProperty(key, theme.vars[key]));
+            if (themeKey === 'diwali_glimmer') {
+                createBokeh();
+            } else {
+                bokehContainer.innerHTML = '';
+            }
+        }
+
+        function buildPrizeSetup() {
+            prizeListSetup.innerHTML = '';
+            gameState.housieCounter = 0;
+            initialPrizes.forEach(p => {
+                prizeListSetup.appendChild(createPrizeInputRow(p));
+            });
+            addHousiePrizeInput(); 
+        }
+
+        function createPrizeInputRow(prize) {
+            const div = document.createElement('div');
+            div.className = 'grid grid-cols-[1fr_auto] items-center gap-4';
+            div.dataset.type = prize.type;
+            div.id = `prize-row-${prize.id}`;
+            div.innerHTML = `<div class="flex items-center gap-3"><input type="checkbox" data-id="${prize.id}" class="h-5 w-5 rounded text-[var(--primary-accent)] focus:ring-0 prize-check" ${prize.checked ? 'checked' : ''}><input type="text" class="prize-name-input w-full" value="${prize.name}"></div><input type="number" data-id="${prize.id}" class="w-28 p-2 rounded-lg border border-[var(--card-border)] bg-[var(--secondary-accent)] text-secondary-accent-text prize-amount" value="${prize.value}">`;
+            return div;
+        }
+        
+        function addHousiePrizeInput() {
+            gameState.housieCounter++;
+            const housieId = `full-housie-${gameState.housieCounter}`;
+            const housieName = `Full Housie ${gameState.housieCounter > 1 ? '#' + gameState.housieCounter : ''}`;
+            const newHousie = { id: housieId, name: housieName, value: 500, checked: true, type: 'housie' };
+            const housieRow = createPrizeInputRow(newHousie);
+            
+            if (gameState.housieCounter > 1) {
+                const deleteBtn = document.createElement('button');
+                deleteBtn.textContent = 'x';
+                deleteBtn.className = 'ml-2 text-red-500 font-bold cursor-pointer';
+                deleteBtn.onclick = () => housieRow.remove();
+                housieRow.querySelector('.prize-name-input').insertAdjacentElement('afterend', deleteBtn);
+            }
+            prizeListSetup.appendChild(housieRow);
+        }
+
+        function startGame() {
+            gameState.prizes = [];
+            gameState.totalPrizeMoney = 0;
+            document.querySelectorAll('#prize-list-setup .grid').forEach(row => {
+                const checkbox = row.querySelector('.prize-check');
+                if (checkbox && checkbox.checked) {
+                    const nameInput = row.querySelector('.prize-name-input');
+                    const name = nameInput.value.trim();
+                    const amountInput = row.querySelector('.prize-amount');
+                    const amount = amountInput ? parseInt(amountInput.value) || 0 : 0;
+                    gameState.prizes.push({ name: name, amount: `₹${amount}`, amountValue: amount, claimed: false });
+                    gameState.totalPrizeMoney += amount;
+                }
+            });
+
+            if (gameState.prizes.length === 0) { showModal("Please select at least one prize!"); return; }
+            gameState.remainingPrizeMoney = gameState.totalPrizeMoney;
+            setupView.classList.add('hidden');
+            setupView.classList.remove('flex');
+            gameView.classList.remove('hidden');
+            gameView.classList.add('flex');
+            resetCurrentGame();
+        }
+
+        function resetCurrentGame() {
+            gameState.availableNumbers = [...gameState.allNumbers];
+            gameState.calledNumbers = [];
+            gameState.prizes.forEach(p => p.claimed = false);
+            gameState.remainingPrizeMoney = gameState.totalPrizeMoney;
+            buildGameBoard(); 
+            buildPrizeList(); 
+            updateGameStats();
+            
+            tumblerTens.style.transition = 'none';
+            tumblerOnes.style.transition = 'none';
+            tumblerTens.style.transform = 'translateY(0)';
+            tumblerOnes.style.transform = 'translateY(0)';
+
+            drawNumberBtn.disabled = false; 
+            drawNumberBtn.textContent = 'Draw Number'; 
+            gameState.isDrawing = false;
+            setActiveTab('generator');
+        }
+        
+        function buildTumblers() {
+            const digits = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9];
+            const repeatedDigits = [...digits, ...digits, ...digits, ...digits]; 
+            
+            tumblerTens.innerHTML = '';
+            tumblerOnes.innerHTML = '';
+
+            repeatedDigits.forEach(digit => {
+                const tensDigitEl = document.createElement('div');
+                tensDigitEl.className = 'tumbler-digit';
+                tensDigitEl.textContent = digit;
+                tumblerTens.appendChild(tensDigitEl);
+
+                const onesDigitEl = document.createElement('div');
+                onesDigitEl.className = 'tumbler-digit';
+                onesDigitEl.textContent = digit;
+                tumblerOnes.appendChild(onesDigitEl);
+            });
+        }
+
+        async function drawNumberAnimated() {
+            if (gameState.isDrawing || gameState.availableNumbers.length === 0) return;
+
+            gameState.isDrawing = true;
+            drawNumberBtn.disabled = true;
+            drawNumberBtn.textContent = 'Drawing...';
+
+            const randomIndex = Math.floor(Math.random() * gameState.availableNumbers.length);
+            const number = gameState.availableNumbers[randomIndex];
+            
+            const tensDigit = Math.floor(number / 10);
+            const onesDigit = number % 10;
+            const digitHeight = tumblerOnes.firstElementChild.offsetHeight;
+
+            tumblerTens.style.transition = 'none';
+            tumblerOnes.style.transition = 'none';
+            tumblerTens.style.transform = `translateY(-${Math.floor(Math.random()*10)*digitHeight}px)`;
+            tumblerOnes.style.transform = `translateY(-${Math.floor(Math.random()*10)*digitHeight}px)`;
+            
+            tumblerOnes.offsetHeight; 
+
+            tumblerTens.style.transition = 'transform 3s cubic-bezier(0.65, 0, 0.35, 1)';
+            tumblerOnes.style.transition = 'transform 3.5s cubic-bezier(0.65, 0, 0.35, 1)';
+
+            const targetTensPos = (30 + tensDigit) * digitHeight;
+            const targetOnesPos = (30 + onesDigit) * digitHeight;
+
+            tumblerTens.style.transform = `translateY(-${targetTensPos}px)`;
+            tumblerOnes.style.transform = `translateY(-${targetOnesPos}px)`;
+
+            setTimeout(() => {
+                gameState.availableNumbers.splice(randomIndex, 1);
+                gameState.calledNumbers.push(number);
+                
+                updateBoard(number);
+                updateGameStats();
+
+                tumblerContainer.classList.add('glow-reveal-animation');
+                tumblerContainer.onanimationend = () => tumblerContainer.classList.remove('glow-reveal-animation');
+
+                gameState.isDrawing = false;
+                drawNumberBtn.disabled = gameState.availableNumbers.length === 0;
+                drawNumberBtn.textContent = 'Draw Number';
+
+                tumblerTens.style.transition = 'none';
+                tumblerOnes.style.transition = 'none';
+                tumblerTens.style.transform = `translateY(-${tensDigit * digitHeight}px)`;
+                tumblerOnes.style.transform = `translateY(-${onesDigit * digitHeight}px)`;
+
+            }, 3600);
+        }
+
+        function buildGameBoard(){numberBoardContainer.innerHTML="";gameState.allNumbers.forEach(e=>{const t=document.createElement("div");t.className="number-cell w-full aspect-square flex items-center justify-center text-sm sm:text-lg font-bold rounded-md sm:rounded-lg",t.textContent=e,numberBoardContainer.appendChild(t)})}
+        function updateBoard(e){numberBoardContainer.querySelector(`.number-cell:nth-child(${e})`)?.classList.add("called")}
+        function buildPrizeList(){prizeListContainer.innerHTML="";gameState.prizes.forEach(e=>{const t=document.createElement("div");t.className=`prize-item card flex flex-col p-4 rounded-xl transition-all ${e.claimed?"opacity-50":""}`,t.innerHTML=`<div class="flex-grow"><p class="font-bold text-lg">${e.name}</p><p class="text-sm text-text-secondary">${e.amount}</p></div><button data-prize-name="${e.name}" class="claim-btn mt-3 px-4 py-1.5 rounded-full font-semibold text-xs btn ${e.claimed?"":"btn-secondary"}">${e.claimed?"CLAIMED":"CLAIM"}</button>`,e.claimed&&(t.querySelector(".claim-btn").style.backgroundColor="var(--called-bg)",t.querySelector(".claim-btn").style.color="var(--called-text)"),prizeListContainer.appendChild(t)}),prizeListContainer.querySelectorAll(".claim-btn").forEach(e=>e.addEventListener("click",t=>togglePrizeClaim(t.target.dataset.prizeName)))}
+        async function togglePrizeClaim(e){const t=gameState.prizes.find(t=>t.name===e);if(t&&!t.claimed){t.claimed=!0;gameState.remainingPrizeMoney-=t.amountValue;await celebrate();buildPrizeList();updateGameStats()}}
+        async function celebrate(){const e=Date.now()+2e3,t={startVelocity:30,spread:360,ticks:60,zIndex:100},o=(e,t)=>Math.random()*(t-e)+e,n=setInterval(()=>{const a=e-Date.now();if(a<=0)return clearInterval(n);const i=50*(a/2e3);"function"==typeof confetti&&(confetti({...t,particleCount:i,origin:{x:o(.1,.3),y:Math.random()-.2}}),confetti({...t,particleCount:i,origin:{x:o(.7,.9),y:Math.random()-.2}}))},250)}
+        function updateGameStats(){
+            remainingCount.textContent=`${gameState.calledNumbers.length} / 90`;
+            const claimedCount = gameState.prizes.filter(p => p.claimed).length;
+            totalPrizeMoneyEl.textContent = `₹${gameState.totalPrizeMoney}`;
+            remainingPrizeMoneyEl.textContent = `₹${gameState.remainingPrizeMoney}`;
+            prizesClaimedStatusEl.textContent = `${claimedCount} / ${gameState.prizes.length} Claimed`;
+
+            const last5 = gameState.calledNumbers.slice(-5).reverse();
+            last5Display.innerHTML="";
+            for(let t=0;t<5;t++){
+                const o=last5[t],n=document.createElement("div");
+                n.className="w-8 h-8 md:w-9 md:h-9 rounded-md flex items-center justify-center font-bold text-sm font-mono",o?(n.textContent=o,n.style.backgroundColor="var(--called-bg)",n.style.color="var(--called-text)"):(n.textContent="-",n.style.backgroundColor="var(--secondary-accent)",n.style.color="var(--secondary-accent-text)"),last5Display.appendChild(n)
+            }
+            
+            pendingPrizesDisplay.innerHTML = '';
+            const pendingPrizes = gameState.prizes.filter(p => !p.claimed);
+
+            if (pendingPrizes.length === 0) {
+                const noPrizesEl = document.createElement('p');
+                noPrizesEl.textContent = 'All prizes claimed!';
+                noPrizesEl.className = 'w-full text-center text-text-secondary font-semibold';
+                pendingPrizesDisplay.appendChild(noPrizesEl);
+            } else {
+                pendingPrizes.forEach(prize => {
+                    const prizeEl = document.createElement('div');
+                    prizeEl.className = 'shrink-0 px-3 py-1 rounded-full bg-[var(--secondary-accent)] text-xs font-bold text-[var(--secondary-accent-text)]';
+                    prizeEl.textContent = prize.name;
+                    pendingPrizesDisplay.appendChild(prizeEl);
+                });
+            }
+        }
+        function verifyTicket(){const e=ticketInput.value.split(/[\s,]+/).filter(Boolean).map(Number).filter(e=>e>0&&e<91);if(0===e.length)return void(verificationResult.innerHTML='<span style="color: orange">Please enter numbers to verify.</span>');const t=e.filter(e=>!gameState.calledNumbers.includes(e));0===t.length?verificationResult.innerHTML='<span style="color: limegreen">🎉 Valid Claim! All numbers called.</span>':verificationResult.innerHTML=`<span style="color: #ff4d4d">Invalid. Missing: ${t.join(", ")}</span>`}
+        function setActiveTab(e){tabsContainer.querySelectorAll(".tab").forEach(t=>t.classList.toggle("active",t.dataset.tab===e)),document.querySelectorAll(".tab-content").forEach(t=>t.classList.toggle("active",t.id===`tab-content-${e}`))}
+        function showModal(e){const t=document.createElement("div");t.style.position="fixed",t.style.left="0",t.style.top="0",t.style.width="100%",t.style.height="100%",t.style.backgroundColor="rgba(0,0,0,0.5)",t.style.display="flex",t.style.justifyContent="center",t.style.alignItems="center",t.style.zIndex="1000",t.innerHTML=`\n                <div style="background: white; color: black; padding: 2rem; border-radius: 1rem; text-align: center;">\n                    <p>${e}</p>\n                    <button id="modal-ok-btn" style="background: #2c5282; color: white; padding: 0.5rem 1.5rem; border-radius: 0.5rem; margin-top: 1rem; border: none;">OK</button>\n                </div>\n            `,document.body.appendChild(t),document.getElementById("modal-ok-btn").addEventListener("click",()=>{document.body.removeChild(t)})}
+        
+        init();
+    });
+    </script>
+</body>
+</html>
+
